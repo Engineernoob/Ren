@@ -1,13 +1,17 @@
+from ast import Bytes
+from io import BytesIO
 import logging
 import os
 import signal
 import sys
 
 from flask import Flask, jsonify, request
+from flask import Response
 from flask_cors import CORS
 
 from agent import Agent
 from config import config
+from voice import transcribe_audio_file
 from voice import listen_to_voice, speak
 
 # Initialize logging
@@ -133,6 +137,45 @@ def handle_voice():
     except Exception as e:
         logger.error(f"Unexpected error in voice handler: {e}")
         return jsonify({"error": "Internal server error"}), 500
+    
+@app.route("/tts", methods=["POST"])
+def generate_speech():
+    """Convert text to speech return MP3."""
+    if ren_agent is None:
+        return jsonify({"error": "Agent not initialized"}), 503
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+    
+    data = request.get_json()
+    text = data.get("text", "")
+    
+    if not isinstance(text, str) or not text.strip():
+        return jsonify({"error": "Invalid text input"}), 400
+    
+    try:
+        audio = speak(text)
+        return Response(audio, content_type="audio/mpeg")
+    except Exception as e:
+        logger.error(f"Error generating speech: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+    
+@app.route("/transcribe", methods=["POST"])
+def transcribe_uploaded_audio():
+    """Accepts uploaded audio and returns Whisper transcription."""
+    if ren_agent is None:
+        return jsonify({"error": "Agent not initialized"}), 503
+    if "file" not in request.files:
+        return jsonify({"error": "Missing audio file"}), 400
+    
+    try:
+        file = request.files["file"]
+        stream = BytesIO(file.read())
+        text = transcribe_audio_file(stream)
+        return jsonify({"text": text})
+    except Exception as e:
+        logger.error(f"Audio transcription failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/health", methods=["GET"])
 def health_check():

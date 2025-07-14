@@ -1,19 +1,24 @@
 # ----------- ren/voice.py -----------
-import sounddevice as sd
-import numpy as np
-import requests
 from io import BytesIO
+import logging
+import os
+import tempfile
+
+import numpy as np
 from pydub import AudioSegment
 from pydub.playback import play
-import logging
+import requests
+import sounddevice as sd
+
 from config import config
+from speech_recognition import model as whisper_model
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Import speech recognition module
-from speech_recognition import model as whisper_model
+
 
 # Global whisper model instance (lazy loading)
 _whisper_model = None
@@ -80,29 +85,66 @@ def listen_to_voice():
     except Exception as e:
         logger.error(f"Voice listening failed: {e}")
         raise RuntimeError(f"Voice listening failed: {e}")
-
-def speak(text):
-    """
-    Convert text to speech using ElevenLabs API and play it.
     
+def transcribe_audio_file(file_stream: BytesIO) -> str:
+    """
+    Transcribe uploaded audio using Whisper (requires writing to temp file).
+
+    Args:
+        file_stream (BytesIO): Incoming audio stream
+
+    Returns:
+        str: Transcribed text
+    """
+    try:
+        model = get_whisper_model()
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+            tmp.write(file_stream.read())
+            tmp_path = tmp.name
+
+        result = model.transcribe(tmp_path)
+        os.remove(tmp_path)  # Clean up the temp file
+
+        if not result or 'text' not in result:
+            raise RuntimeError("Transcription failed or no text returned")
+
+        text = result.get("text", "")
+        if isinstance(text, list):
+            text = "".join(str(t) for t in text)
+        elif not isinstance(text, str):
+            raise RuntimeError("Transcription text is not a valid string or list")
+
+        return text.strip()
+    except Exception as e:
+        logger.error(f"Transcription failed: {e}")
+        raise RuntimeError(f"Transcription failed: {e}")
+
+
+def speak(text) -> bytes:
+    """
+    Convert text to speech using ElevenLabs API and return MP3 bytes.
+
     Args:
         text (str): Text to convert to speech
-        
+
+    Returns:
+        bytes: MP3 audio content
+
     Raises:
-        RuntimeError: If text-to-speech conversion or playback fails
+        RuntimeError: On API or conversion error
     """
     if not text or not text.strip():
         logger.warning("Empty text provided to speak function")
-        return
-    
+        return b""
+
     text = text.strip()
-    print(f"Ren: {text}")
-    
-    # Check if voice is configured
+    logger.info(f"Ren: {text}")
+
     if not config.is_voice_enabled():
         logger.warning("Voice not configured, skipping TTS")
-        return
-    
+        return b""
+
     try:
         url = f"https://api.elevenlabs.io/v1/text-to-speech/{config.ELEVEN_VOICE_ID}"
         headers = {
@@ -113,23 +155,15 @@ def speak(text):
             "text": text,
             "voice_settings": {"stability": 0.4, "similarity_boost": 0.75}
         }
-        
+
         logger.info("Calling ElevenLabs TTS API...")
         response = requests.post(url, json=payload, headers=headers, timeout=30)
-        
+
         if response.status_code != 200:
             raise RuntimeError(f"ElevenLabs API error: {response.status_code} - {response.text}")
-        
-        if not response.content:
-            raise RuntimeError("Empty response from ElevenLabs API")
-        
-        # Play audio
-        audio_data = BytesIO(response.content)
-        audio_segment = AudioSegment.from_mp3(audio_data)
-        play(audio_segment)
-        
-        logger.info("Speech playback completed")
-        
+
+        return response.content
+
     except requests.exceptions.RequestException as e:
         logger.error(f"Network error during TTS: {e}")
         raise RuntimeError(f"Network error during text-to-speech: {e}")
