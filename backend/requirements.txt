@@ -1,0 +1,17 @@
+# Ren Voice Assistant Backend Dependencies
+
+# Web framework
+Flask==2.3.3
+Flask-CORS==4.0.0
+
+# Audio processing
+sounddevice==0.4.6
+numpy==1.24.3
+pydub==0.25.1
+
+# Speech recognition and synthesis
+openai-whisper==20231117
+requests==2.31.0
+
+# Logging and utilities
+python-dotenv==1.0.0
