@@ -54,3 +54,8 @@ ren_memory.json
 # Render deploy cache (optional)
 render.yaml
 env_template.txt
+frontend/package-lock.json
+.gitignore
+
+# Frontend files
+node_modules/
