@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { NotchRen } from "@/ren-front/NotchRen"
+import { NotchRen } from "./ren-front/NotchRen"
 
 export default function App() {
   const [state, setState] = useState<"idle" | "listening" | "responding" | "error">("idle")
