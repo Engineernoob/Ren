@@ -1,6 +1,6 @@
 @import "tailwindcss/preflight";
 @import "tailwindcss/utilities";
-@import "tailwindcss-animate";
+
 
 /* Root container setup */
 #root {
