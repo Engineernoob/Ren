@@ -100,40 +100,43 @@ def handle_voice():
     try:
         if ren_agent is None:
             return jsonify({"error": "Agent not initialized"}), 503
-        
+
         if not config.is_voice_enabled():
             return jsonify({
                 "error": "Voice functionality not configured. Please set ELEVENLABS_API_KEY and ELEVEN_VOICE_ID environment variables."
             }), 503
-        
+
         logger.info("Processing voice request...")
-        
+
         try:
             user_input = listen_to_voice()
         except RuntimeError as e:
             logger.error(f"Voice listening failed: {e}")
             return jsonify({"error": f"Voice listening failed: {str(e)}"}), 400
-        
+
         try:
             response = ren_agent.process_statement(user_input)
+            last_sentiment = ren_agent.memory_store.get("last_sentiment", {})
+            tone = last_sentiment.get("sentiment", "calm")  # default to "calm"
         except ValueError as e:
             logger.warning(f"Invalid voice input: {e}")
             return jsonify({"error": f"Invalid input: {str(e)}"}), 400
-        
+
         try:
-            speak(response)
+            speak(response, tone=tone)  # 🎤 pass tone into TTS
             speech_status = "success"
         except RuntimeError as e:
             logger.error(f"Speech synthesis failed: {e}")
             speech_status = f"failed: {str(e)}"
-        
+
         return jsonify({
             "heard": user_input,
             "response": response,
+            "tone": tone,
             "speech_status": speech_status,
             "conversation_summary": ren_agent.get_conversation_summary()
         })
-        
+
     except Exception as e:
         logger.error(f"Unexpected error in voice handler: {e}")
         return jsonify({"error": "Internal server error"}), 500
