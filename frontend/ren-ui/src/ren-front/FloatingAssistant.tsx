@@ -1,209 +1,259 @@
-'use client'
+"use client";
 
-import React, { useState, useRef} from 'react'
-import { Mic, MicOff, Volume2, MessageCircle, X, History} from 'lucide-react'
+import { useState, useRef } from "react";
+import {
+  Mic,
+  MicOff,
+  Volume2,
+  MessageCircle,
+  X,
+  History,
+  AlertTriangle,
+} from "lucide-react";
 
-type AssistantState = 'idle' | 'listening' | 'speaking' | 'thinking'
+export type AssistantState = "idle" | "listening" | "thinking" | "speaking";
 
 interface FloatingAssistantProps {
-  variant?: 'default' | 'minimal' | 'premium'
-  state?: AssistantState
-  isExpanded?: boolean
-  onStateChange?: (state: AssistantState) => void
-  onToggleExpanded?: () => void
+  variant?: "default" | "minimal" | "premium";
+  state: AssistantState;
+  isExpanded: boolean;
+  onStateChange: (s: AssistantState) => void;
+  onToggleExpanded: () => void;
 }
 
-export function FloatingAssistant({ 
-  variant = 'default', 
-  state = 'idle',
-  isExpanded = false,
+export function FloatingAssistant({
+  variant = "default",
+  state,
+  isExpanded,
   onStateChange,
-  onToggleExpanded 
+  onToggleExpanded,
 }: FloatingAssistantProps) {
-  const [inputValue, setInputValue] = useState('')
-  const [isVoiceOnly, setIsVoiceOnly] = useState(false)
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hello! I\'m Ren, your AI assistant. How can I help you today?' },
-    { role: 'user', content: 'What\'s the weather like?' },
-    { role: 'assistant', content: 'I\'d be happy to help with the weather! However, I don\'t have access to real-time weather data. You can check your local weather app or ask me something else.' }
-  ])
-  const inputRef = useRef<HTMLInputElement>(null)
+  /* local only */
+  const [inputValue, setInputValue] = useState("");
+  const [isVoiceOnly, setIsVoiceOnly] = useState(false);
+  const [messages, setMessages] = useState<
+    { role: "user" | "assistant"; content: string }[]
+  >([
+    {
+      role: "assistant",
+      content: "Hello! I'm Ren, your AI assistant. How can I help you today?",
+    },
+  ]);
 
+  const inputRef = useRef<HTMLInputElement>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
+  /* ────────── Media-Recorder helpers ────────── */
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      recorderRef.current = rec;
+      chunksRef.current = [];
+
+      rec.ondataavailable = (e) =>
+        e.data.size && chunksRef.current.push(e.data);
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        uploadAudio(new Blob(chunksRef.current, { type: "audio/wav" }));
+      };
+
+      rec.start();
+      onStateChange("listening");
+    } catch (err) {
+      console.error("Mic access error:", err);
+    }
+  };
+
+  const stopRecording = () => recorderRef.current?.stop();
+
+  /* ────────── Whisper backend ────────── */
+  const uploadAudio = async (blob: Blob) => {
+    const fd = new FormData();
+    fd.append("file", blob, "recording.wav"); // Flask expects 'file'
+    try {
+      onStateChange("thinking");
+      const res = await fetch("http://localhost:5001/transcribe", {
+        method: "POST",
+        body: fd,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { text } = await res.json(); // returns { text: "..." }
+
+      setMessages((m) => [...m, { role: "user", content: text }]);
+      /* ⬇️ TODO: call your LLM -> reply */
+      setMessages((m) => [
+        ...m,
+        {
+          role: "assistant",
+          content: "I’ve received your request. (LLM reply goes here)",
+        },
+      ]);
+      onStateChange("idle");
+    } catch (err) {
+      console.error("Whisper backend error:", err);
+    }
+  };
+
+  /* ────────── UI helpers ────────── */
   const handleToggleListening = () => {
-    const newState = state === 'listening' ? 'idle' : 'listening'
-    onStateChange?.(newState)
-  }
+    state === "listening" ? stopRecording() : startRecording();
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (inputValue.trim()) {
-      setMessages(prev => [...prev, { role: 'user', content: inputValue }])
-      setInputValue('')
-      onStateChange?.('thinking')
-      
-      // Simulate AI response
-      setTimeout(() => {
-        setMessages(prev => [...prev, { 
-          role: 'assistant', 
-          content: 'I understand your request. Let me help you with that...' 
-        }])
-        onStateChange?.('idle')
-      }, 2000)
-    }
-  }
+    e.preventDefault();
+    if (!inputValue.trim()) return;
+    setMessages((prev) => [...prev, { role: "user", content: inputValue }]);
+    setInputValue("");
+    onStateChange("thinking");
 
-  const getStateIndicator = () => {
+    /* fake AI reply */
+    setTimeout(() => {
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "Sure — here's a stubbed response." },
+      ]);
+      onStateChange("idle");
+    }, 1500);
+  };
+
+  const indicator = (() => {
     switch (state) {
-      case 'listening':
-        return { text: 'Listening...', color: 'text-blue-400', pulse: true }
-      case 'speaking':
-        return { text: 'Speaking...', color: 'text-green-400', pulse: true }
-      case 'thinking':
-        return { text: 'Thinking...', color: 'text-amber-400', pulse: true }
+      case "listening":
+        return { text: "Listening…", color: "text-blue-400" };
+      case "thinking":
+        return { text: "Thinking…", color: "text-amber-400" };
+      case "speaking":
+        return { text: "Speaking…", color: "text-green-400" };
       default:
-        return { text: 'Ready', color: 'text-slate-400', pulse: false }
+        return { text: "Ready", color: "text-slate-400" };
     }
-  }
+  })();
 
-  const stateIndicator = getStateIndicator()
+  const variantStyles = {
+    default: {
+      container: "bg-white/20 border-white/30",
+      input: "bg-white/10 border-white/20",
+      button: "bg-white/20 hover:bg-white/30",
+    },
+    minimal: {
+      container: "bg-white/10 border-white/20",
+      input: "bg-white/5  border-white/10",
+      button: "bg-white/10 hover:bg-white/20",
+    },
+    premium: {
+      container: "bg-slate-900/40 border-slate-700/30",
+      input: "bg-slate-800/30 border-slate-600/20",
+      button: "bg-slate-700/30 hover:bg-slate-600/40",
+    },
+  }[variant];
 
-  // Variant-specific styles
-  const getVariantStyles = () => {
-    switch (variant) {
-      case 'minimal':
-        return {
-          container: 'bg-white/10 border-white/20',
-          input: 'bg-white/5 border-white/10',
-          button: 'bg-white/10 hover:bg-white/20'
-        }
-      case 'premium':
-        return {
-          container: 'bg-slate-900/40 border-slate-700/30',
-          input: 'bg-slate-800/30 border-slate-600/20',
-          button: 'bg-slate-700/30 hover:bg-slate-600/40'
-        }
-      default:
-        return {
-          container: 'bg-white/20 border-white/30',
-          input: 'bg-white/10 border-white/20',
-          button: 'bg-white/20 hover:bg-white/30'
-        }
-    }
-  }
-
-  const styles = getVariantStyles()
-
+  /* ────────── JSX ────────── */
   return (
-    <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-50">
-      {/* Main floating bar */}
-      <div 
-        className={`
-          relative backdrop-blur-xl ${styles.container}
+    <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50">
+      <div
+        className={`relative backdrop-blur-xl ${variantStyles.container}
           border rounded-3xl shadow-2xl transition-all duration-500 ease-out
-          ${isExpanded ? 'w-96' : 'w-80'}
-          ${variant === 'premium' ? 'shadow-slate-900/20' : 'shadow-black/10'}
-        `}
+          ${isExpanded ? "w-96" : "w-80"}`}
       >
-        {/* Main content */}
-        <div className="p-4">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center space-x-2">
-              <div className={`w-2 h-2 rounded-full ${stateIndicator.pulse ? 'animate-pulse' : ''} ${stateIndicator.color === 'text-blue-400' ? 'bg-blue-400' : stateIndicator.color === 'text-green-400' ? 'bg-green-400' : stateIndicator.color === 'text-amber-400' ? 'bg-amber-400' : 'bg-slate-400'}`} />
-              <span className={`text-sm ${stateIndicator.color}`}>
-                {stateIndicator.text}
-              </span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <button
-                onClick={onToggleExpanded}
-                className={`p-1.5 rounded-lg ${styles.button} transition-all duration-200 text-white/70 hover:text-white`}
-              >
-                {isExpanded ? <X className="w-4 h-4" /> : <History className="w-4 h-4" />}
-              </button>
-            </div>
+        {/* Header */}
+        <div className="p-4 pb-0 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${indicator.color}`} />
+            <span className={`text-sm ${indicator.color}`}>
+              {indicator.text}
+            </span>
+            && (
+            <AlertTriangle className="w-4 h-4 text-red-400" />){"}"}
           </div>
 
-          {/* Input area */}
-          {!isVoiceOnly && (
-            <form onSubmit={handleSubmit} className="mb-3">
-              <div className="relative">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder="Ask Ren anything..."
-                  className={`
-                    w-full px-4 py-2.5 ${styles.input}
-                    border rounded-2xl transition-all duration-200
-                    placeholder-white/50 text-white bg-transparent
-                    focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50
-                  `}
-                  disabled={state === 'thinking'}
-                />
-                {state === 'thinking' && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                    <div className="w-4 h-4 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
-                  </div>
-                )}
-              </div>
-            </form>
-          )}
-
-          {/* Controls */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={handleToggleListening}
-                className={`
-                  p-2.5 rounded-xl transition-all duration-200
-                  ${state === 'listening' 
-                    ? 'bg-blue-500/80 text-white shadow-lg shadow-blue-500/25' 
-                    : `${styles.button} text-white/70 hover:text-white`
-                  }
-                `}
-              >
-                {state === 'listening' ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-              </button>
-              
-              <button
-                onClick={() => setIsVoiceOnly(!isVoiceOnly)}
-                className={`p-2.5 rounded-xl ${styles.button} transition-all duration-200 text-white/70 hover:text-white`}
-              >
-                <MessageCircle className="w-4 h-4" />
-              </button>
-            </div>
-
-            <button
-              className={`p-2.5 rounded-xl ${styles.button} transition-all duration-200 text-white/70 hover:text-white`}
-            >
-              <Volume2 className="w-4 h-4" />
-            </button>
-          </div>
+          <button
+            onClick={onToggleExpanded}
+            className={`p-1.5 rounded-lg ${variantStyles.button} transition`}
+          >
+            {isExpanded ? (
+              <X className="w-4 h-4" />
+            ) : (
+              <History className="w-4 h-4" />
+            )}
+          </button>
         </div>
 
-        {/* Expanded content */}
+        {/* Text input (disabled while thinking) */}
+        {!isVoiceOnly && (
+          <form onSubmit={handleSubmit} className="p-4 pb-0">
+            <div className="relative">
+              <input
+                ref={inputRef}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder="Ask Ren anything..."
+                className={`w-full px-4 py-2.5 ${variantStyles.input}
+                  border rounded-2xl placeholder-white/50 text-white bg-transparent
+                  focus:outline-none focus:ring-2 focus:ring-blue-400/50`}
+                disabled={state === "thinking"}
+              />
+              {state === "thinking" && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+              )}
+            </div>
+          </form>
+        )}
+
+        {/* Control buttons */}
+        <div className="p-4 flex items-center justify-between">
+          <div className="flex gap-2">
+            <button
+              onClick={handleToggleListening}
+              className={`p-2.5 rounded-xl transition ${
+                state === "listening"
+                  ? "bg-blue-500/80 text-white"
+                  : `${variantStyles.button} text-white/70 hover:text-white`
+              }`}
+              title={state === "listening" ? "Stop" : "Start voice"}
+            >
+              {state === "listening" ? (
+                <Mic className="w-4 h-4" />
+              ) : (
+                <MicOff className="w-4 h-4" />
+              )}
+            </button>
+
+            <button
+              onClick={() => setIsVoiceOnly((v) => !v)}
+              className={`p-2.5 rounded-xl ${variantStyles.button} transition text-white/70 hover:text-white`}
+              title="Toggle voice-only"
+            >
+              <MessageCircle className="w-4 h-4" />
+            </button>
+          </div>
+
+          <button
+            className={`p-2.5 rounded-xl ${variantStyles.button} transition text-white/70 hover:text-white`}
+            title="Speaker"
+          >
+            <Volume2 className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Expanded history */}
         {isExpanded && (
           <div className="border-t border-white/20 p-4 max-h-64 overflow-y-auto">
-            <div className="space-y-3">
-              {messages.map((message, index) => (
+            <div className="space-y-3 text-sm">
+              {messages.map((m, i) => (
                 <div
-                  key={index}
-                  className={`text-sm ${
-                    message.role === 'user' 
-                      ? 'text-right text-white/90' 
-                      : 'text-left text-white/70'
-                  }`}
+                  key={i}
+                  className={`flex ${m.role === "user" ? "justify-end" : ""}`}
                 >
                   <div
-                    className={`inline-block px-3 py-2 rounded-xl max-w-[80%] ${
-                      message.role === 'user'
-                        ? 'bg-blue-500/20 border border-blue-400/30'
-                        : 'bg-white/10 border border-white/20'
+                    className={`px-3 py-2 rounded-xl max-w-[80%] ${
+                      m.role === "user"
+                        ? "bg-blue-500/20 border border-blue-400/30 text-white/90"
+                        : "bg-white/10 border border-white/20 text-white/70"
                     }`}
                   >
-                    {message.content}
+                    {m.content}
                   </div>
                 </div>
               ))}
@@ -212,11 +262,13 @@ export function FloatingAssistant({
         )}
       </div>
 
-      {/* Voice-only mode overlay */}
+      {/* Voice-only overlay */}
       {isVoiceOnly && (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center">
-            <div className={`w-16 h-16 rounded-full ${styles.container} border flex items-center justify-center mb-2`}>
+            <div
+              className={`w-16 h-16 rounded-full ${variantStyles.container} border flex items-center justify-center mb-2`}
+            >
               <Mic className="w-8 h-8 text-white/80" />
             </div>
             <p className="text-white/60 text-sm">Voice mode active</p>
@@ -224,5 +276,5 @@ export function FloatingAssistant({
         </div>
       )}
     </div>
-  )
+  );
 }
