@@ -6,10 +6,11 @@ from typing import Optional
 
 from config import config
 from dialogue_manager import DialogueManager
-from sentiment_analyzer import analyze_tone
+from generate_reply import generate_reply
 from persistent_memory import PersistentMemory
-from reminder_scheduler import ReminderScheduler
 from reminder_loop import ReminderLoop
+from reminder_scheduler import ReminderScheduler
+from sentiment_analyzer import analyze_tone
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -37,6 +38,8 @@ class Agent:
     def process_statement(self, user_input: str) -> str:
         if not user_input or not isinstance(user_input, str) or not user_input.strip():
             raise ValueError("User input must be a non-empty string")
+        if self._is_correction_triggered(user_input):
+            return self.retry_with_correction()
 
         user_input = user_input.strip()
         logger.info(f"Processing user input: {user_input[:100]}...")
@@ -105,6 +108,44 @@ class Agent:
             return "That came through pretty strong. Want to talk through it or switch topics?"
         else:
             return None
+        
+    def _is_correction_triggered(self, user_input: str) -> bool:
+        correction_phrases = [
+            "that's not", "you misunderstood", "not what i meant", "wrong", "incorrect", "that isn't it", "no what i meant"]
+        return any(word in user_input.lower() for word in correction_phrases)
+    
+    def retry_with_correction(self) -> str:
+        last = self.memory_store.get("last_exchange", {})
+        if not last:
+            return "I'll need more context to correct myself - could you clarity what I missed?"
+        
+        original_input = last.get("input", "")
+        last_response = last.get("response", "")
+        tone_data = self.memory_store.get("last_sentiment", {})
+        
+        retry_prompt = (
+            f"The user said: \"{original_input}\n\n"
+            f"I responded: \"{last_response}\n\n"
+            "The user seems unsatisfied. Try again - but this time, be more accurate, emotionally aware, and flexiable in interpretation. \n "
+        )
+        
+        try:
+            retry_reply = generate_reply(
+                user_input=retry_prompt,
+                memory="",
+                tone_data=tone_data,
+                user_name=self.user_name,  
+            )
+            self.memory_store.set("last_exchange", {
+                "input": original_input,
+                "response": retry_reply,
+                "corrected": True,
+                })
+            return f"[REWRITE] {retry_reply}"
+        except Exception as e:
+            logger.error(f"Error generating response: {e}")
+            return f"I'm sorry, but something went wrong on my end: {str(e)}"
+
             
     def _generate_response(self, user_input: str, sentiment: Optional[str] = None) -> str:
         user_lower = user_input.lower()
