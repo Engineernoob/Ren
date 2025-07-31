@@ -1,6 +1,6 @@
 from config import config
-from .assistants.ollama_engine import OllamaEngine
-from .assistants.openrouter_engine import OpenRouterEngine
+from assistants.openrouter_engine import OpenRouterEngine
+from assistants.ollama_engine import OllamaEngine
 
 class LLMEngine:
     def __init__(self):
