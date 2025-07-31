@@ -54,7 +54,7 @@ def teardown(exception):
         ren_agent.scheduler.stop()
         logger.info("Reminder scheduler stopped")
 
-@app.route("/ask", methods=["POST"])
+@app.route("/chat", methods=["POST"])
 def handle_text():
     """Handle text-based chat requests."""
     try:
