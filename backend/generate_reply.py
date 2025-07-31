@@ -1,7 +1,5 @@
 from typing import Optional
-
 from config import config
-
 from llm_engine import LLMEngine
 
 REN_IDENTITY = """
@@ -23,13 +21,21 @@ def generate_reply(
     tone_data: dict,
     user_name: Optional[str] = None
 ) -> str:
-    tone = tone_data.get("tone", "neutral")
-    raw = tone_data.get("raw_label", "")
-    confidence = tone_data.get("confidence", 0.0)
+    try:
+        tone = tone_data.get("tone", "neutral")
+        raw = tone_data.get("raw_label", "")
+        confidence = tone_data.get("confidence", 0.0)
 
-    name_prefix = f"{user_name}, " if user_name else ""
+        if not isinstance(confidence, (float, int)) or confidence < 0 or confidence > 1:
+            raise ValueError(f"Invalid confidence value: {confidence}")
+        
+        # Optional low-confidence fallback
+        if confidence < 0.3:
+            return "I'm sensing something's off. Want to try saying that another way?"
 
-    prompt = f"""{REN_IDENTITY}
+        name_prefix = f"{user_name}, " if user_name else ""
+
+        prompt = f"""{REN_IDENTITY}
 
 Tone: {tone} (raw: {raw}, confidence: {confidence})
 Recent Memory:
@@ -39,8 +45,8 @@ Recent Memory:
 
 Ren’s reply:"""
 
-    try:
         return engine.chat(prompt).strip()
+
     except Exception as e:
         print(f"[generate_reply] Error: {e}")
         return "I'm still here — just thinking. Could you say that again?"
