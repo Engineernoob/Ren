@@ -69,68 +69,6 @@ export default function App() {
       {/* ░▒▓ NOTCH UI ▓▒░ */}
       <NotchRen />
 
-      {/* ░▒▓ DEV CONTROLS (debug only) ▓▒░ */}
-      <div className="absolute bottom-8 left-8 bg-black/20 backdrop-blur-xl border border-white/20 rounded-2xl p-4 space-y-3 max-w-xs">
-        <h4 className="text-white/90 text-sm">Dev Controls</h4>
-
-        <div>
-          <label className="block text-white/70 text-xs mb-2">
-            Assistant State
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            {(["idle", "listening", "responding", "error"] as const).map(
-              (s) => (
-                <button
-                  key={s}
-                  onClick={() => toggleState(s)}
-                  className={`px-3 py-2 rounded-lg text-xs border capitalize transition-all duration-200
-                  ${
-                    state === s
-                      ? "bg-blue-500/30 border-blue-400/50 text-white"
-                      : "bg-white/5 border-white/20 text-white/70 hover:bg-white/10"
-                  }`}
-                >
-                  {s}
-                </button>
-              )
-            )}
-          </div>
-        </div>
-
-        {/* Toggles */}
-        <div className="space-y-2">
-          <ToggleRow
-            label="Expanded View"
-            value={isExpanded}
-            onToggle={toggleExpanded}
-            activeColor="bg-blue-500"
-          />
-          <ToggleRow
-            label="Handoff Sync"
-            value={isHandoffActive}
-            onToggle={toggleHandoff}
-            activeColor="bg-green-500"
-          />
-        </div>
-
-        {/* Status */}
-        <div className="pt-2 border-t border-white/20 text-xs text-white/50 space-y-1">
-          <div>
-            State: <span className="text-white/70 capitalize">{state}</span>
-          </div>
-          <div>
-            Expanded:{" "}
-            <span className="text-white/70">{isExpanded ? "Yes" : "No"}</span>
-          </div>
-          <div>
-            Handoff:{" "}
-            <span className="text-white/70">
-              {isHandoffActive ? "Active" : "Inactive"}
-            </span>
-          </div>
-        </div>
-      </div>
-
       {/* ░▒▓ HANDOFF STATUS ▓▒░ */}
       {isHandoffActive && (
         <div className="absolute top-20 right-8 bg-green-500/20 backdrop-blur-xl border border-green-400/30 rounded-xl p-3 max-w-xs">
