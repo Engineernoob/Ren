@@ -45,28 +45,32 @@ export function NotchRen() {
   };
 
   /* ---------- Backend call ---------- */
-  const sendToBackend = async (blob: Blob) => {
-    const formData = new FormData();
-    formData.append("audio", blob, "recording.wav");
+  /* --- NotchRen.tsx  --------------------------------------------- */
+const sendToBackend = async (blob: Blob) => {
+  /* 1️⃣  use the key Flask expects:  "file" */
+  const formData = new FormData();
+  formData.append("file", blob, "recording.wav");
 
-    try {
-      setState("responding");
-      const res = await fetch("http://localhost:5001/transcribe", {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  try {
+    setState("responding");
 
-      const data = await res.json(); // { transcript: "...", response: "..." }
-      setTranscript(data.transcript);
-      setResponse(data.response);
-      setState("idle");
-    } catch (err) {
-      console.error("Whisper backend error:", err);
-      setState("error");
-    }
-  };
+    /* 2️⃣  same /transcribe endpoint, now on port 5001 */
+    const res = await fetch("http://localhost:5001/transcribe", {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
+    /* 3️⃣  Flask returns { "text": "<transcript>" } */
+    const { text } = await res.json();
+    setTranscript(text);      // show what you said
+    setResponse("");          // add LLM reply later if you wish
+    setState("idle");
+  } catch (err) {
+    console.error("Whisper backend error:", err);
+    setState("error");
+  }
+};
   /* ---------- UI helpers ---------- */
   const handleMicClick = () => {
     if (state === "listening") stopRecording();
