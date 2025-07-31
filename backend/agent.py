@@ -46,7 +46,7 @@ class Agent:
 
         tone_data = analyze_tone(user_input)
         sentiment = tone_data["tone"]
-        confidence = tone_data["confidence", 0.0]
+        confidence = tone_data.get("confidence", 0.0)
         logger.info(f"Sentiment analysis result: {tone_data}")
 
         self.memory_store.set("last_sentiment", {
