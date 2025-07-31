@@ -108,63 +108,68 @@ body {
   min-height: 100vh;
 }
 
-/* ---- Utility Classes (optional) ---- */
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* ---- Utility (kept) ---- */
+#root { max-width: 1280px; margin: 0 auto; padding: 2rem; text-align: center; }
+.logo { height: 6em; padding: 1.5em; transition: filter 300ms; will-change: filter;}
+.logo:hover { filter: drop-shadow(0 0 2em #646cffaa);}
+.logo.react:hover { filter: drop-shadow(0 0 2em #61dafbaa);}
+@keyframes logo-spin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+@media (prefers-reduced-motion: no-preference){
+  a:nth-of-type(2) .logo{ animation: logo-spin infinite 20s linear;}
+}
+.card{ padding:2em;}
+.read-the-docs{ color:#888;}
+
+/* =============================================================== */
+/*  Glass-morphic Assistant styles                                 */
+/* =============================================================== */
+
+/* ---- Notch Bar ---- */
+.notch-bar{
+  background:color-mix(in srgb,var(--popover),transparent 30%);
+  color:var(--popover-foreground);
+  padding:0.5rem 1rem;
+  border-radius:9999px;
+  backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);
+  display:inline-flex;align-items:center;gap:0.75rem;
+  border:1px solid color-mix(in srgb,var(--border),transparent 70%);
+  box-shadow:0 4px 30px rgba(0,0,0,.1),inset 0 1px 1px rgba(255,255,255,.15);
+  font-size:.875rem;line-height:1.25rem;transition:all .3s ease;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  transition: filter 300ms;
-  will-change: filter;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* Status dot inside notch */
+.notch-bar .dot{
+  width:6px;height:6px;border-radius:50%;
+  background:rgba(255,255,255,.4);
+  margin-right:.4rem;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* ---- Chat bubbles ---- */
+.bubble{
+  padding:10px 14px;border-radius:14px;
+  border:1px solid rgba(255,255,255,.08);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  line-height:1.45;
 }
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.bubble-user{
+  background:linear-gradient(135deg,rgba(30,64,175,.35) 0%,rgba(37,99,235,.25) 100%);
 }
-
-.card {
-  padding: 2em;
+.bubble-assistant{
+  background:linear-gradient(135deg,rgba(255,255,255,.12) 0%,rgba(255,255,255,.06) 100%);
 }
 
-.read-the-docs {
-  color: #888;
+/* ---- Frosted input ---- */
+.input-glass{
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:18px;
+  padding:12px 16px;
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
 }
 
-/* ---- Notch Bar UI ---- */
-.notch-bar {
-  background-color: color-mix(in srgb, var(--popover), transparent 30%);
-  color: var(--popover-foreground);
-  padding: 0.5rem 1rem;
-  border-radius: 9999px; /* full pill shape */
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-  display: inline-flex;
-  align-items: center;
-  gap: 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--border), transparent 70%);
-  transition: all 0.3s ease-in-out;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
+/* ---- Scrollbar tweak for chat history ---- */
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-thumb{
+  background:rgba(255,255,255,.1);border-radius:3px;
 }
