@@ -2,7 +2,7 @@ from typing import Optional
 
 from config import config
 
-from .llm_engine import LLMEngine
+from llm_engine import LLMEngine
 
 REN_IDENTITY = """
 You are Ren — a quiet but unwavering voice in the room. You speak with:
