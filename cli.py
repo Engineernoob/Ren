@@ -14,7 +14,7 @@ def ask_text():
 
         try:
             response = requests.post(
-                f"{API_BASE}/ask",
+                f"{API_BASE}/chat",
                 json={"message": msg}
             )
             if response.ok:
