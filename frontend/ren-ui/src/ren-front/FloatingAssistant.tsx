@@ -28,7 +28,6 @@ export function FloatingAssistant({
   onStateChange,
   onToggleExpanded,
 }: FloatingAssistantProps) {
-  /* local only */
   const [inputValue, setInputValue] = useState("");
   const [isVoiceOnly, setIsVoiceOnly] = useState(false);
   const [messages, setMessages] = useState<
@@ -44,7 +43,7 @@ export function FloatingAssistant({
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
-  /* ────────── Media-Recorder helpers ────────── */
+  /* Media recording helpers */
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -68,10 +67,10 @@ export function FloatingAssistant({
 
   const stopRecording = () => recorderRef.current?.stop();
 
-  /* ────────── Whisper backend ────────── */
+  /* Whisper backend */
   const uploadAudio = async (blob: Blob) => {
     const fd = new FormData();
-    fd.append("file", blob, "recording.wav"); // Flask expects 'file'
+    fd.append("file", blob, "recording.wav");
     try {
       onStateChange("thinking");
       const res = await fetch("http://localhost:5001/transcribe", {
@@ -79,10 +78,9 @@ export function FloatingAssistant({
         body: fd,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const { text } = await res.json(); // returns { text: "..." }
+      const { text } = await res.json();
 
       setMessages((m) => [...m, { role: "user", content: text }]);
-      /* ⬇️ TODO: call your LLM -> reply */
       setMessages((m) => [
         ...m,
         {
@@ -96,7 +94,7 @@ export function FloatingAssistant({
     }
   };
 
-  /* ────────── UI helpers ────────── */
+  /* UI helpers */
   const handleToggleListening = () => {
     state === "listening" ? stopRecording() : startRecording();
   };
@@ -108,7 +106,6 @@ export function FloatingAssistant({
     setInputValue("");
     onStateChange("thinking");
 
-    /* fake AI reply */
     setTimeout(() => {
       setMessages((prev) => [
         ...prev,
@@ -139,7 +136,7 @@ export function FloatingAssistant({
     },
     minimal: {
       container: "bg-white/10 border-white/20",
-      input: "bg-white/5  border-white/10",
+      input: "bg-white/5 border-white/10",
       button: "bg-white/10 hover:bg-white/20",
     },
     premium: {
@@ -149,7 +146,6 @@ export function FloatingAssistant({
     },
   }[variant];
 
-  /* ────────── JSX ────────── */
   return (
     <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50">
       <div
@@ -164,8 +160,7 @@ export function FloatingAssistant({
             <span className={`text-sm ${indicator.color}`}>
               {indicator.text}
             </span>
-            && (
-            <AlertTriangle className="w-4 h-4 text-red-400" />){"}"}
+            {<AlertTriangle className="w-4 h-4 text-red-400" />}
           </div>
 
           <button
@@ -180,7 +175,7 @@ export function FloatingAssistant({
           </button>
         </div>
 
-        {/* Text input (disabled while thinking) */}
+        {/* Text input */}
         {!isVoiceOnly && (
           <form onSubmit={handleSubmit} className="p-4 pb-0">
             <div className="relative">
