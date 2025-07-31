@@ -2,18 +2,14 @@ import { useState } from "react";
 import { NotchRen } from "./ren-front/NotchRen";
 
 export default function App() {
+  // assistant state and expansion state
   const [state, setState] = useState<
-    "idle" | "listening" | "responding" | "error"
+    "idle" | "listening" | "thinking" | "responding" | "speaking" | "error"
   >("idle");
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isHandoffActive, setIsHandoffActive] = useState(false);
-
-  const toggleState = (newState: typeof state) => setState(newState);
-  const toggleExpanded = () => setIsExpanded((prev) => !prev);
-  const toggleHandoff = () => setIsHandoffActive((prev) => !prev);
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="dark min-h-screen relative overflow-hidden">
       {/* ░▒▓ BACKGROUND & SYSTEM UI MOCK ▓▒░ */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
         <div className="absolute inset-0 opacity-30">
@@ -26,21 +22,7 @@ export default function App() {
 
       <div className="absolute inset-0 pointer-events-none">
         {/* Fake Menu Bar */}
-        <div className="absolute top-0 left-0 right-0 h-6 bg-black/30 backdrop-blur-xl border-b border-white/10">
-          <div className="flex justify-between items-center h-full px-4">
-            <div className="flex space-x-4">
-              <div className="w-4 h-4 bg-white/20 rounded" />
-              <div className="w-16 h-3 bg-white/15 rounded" />
-              <div className="w-12 h-3 bg-white/10 rounded" />
-            </div>
-            <div className="flex space-x-3">
-              <div className="w-8 h-3 bg-white/15 rounded" />
-              <div className="w-6 h-3 bg-white/15 rounded" />
-              <div className="w-4 h-3 bg-white/15 rounded" />
-            </div>
-          </div>
-        </div>
-
+        <div className="absolute top-0 left-0 right-0 h-6 bg-black/30 backdrop-blur-xl border-b border-white/10" />
         {/* Fake Desktop Icons */}
         <div className="absolute top-40 right-8 space-y-6">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -50,7 +32,6 @@ export default function App() {
             </div>
           ))}
         </div>
-
         {/* Dock */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
           <div className="bg-white/15 backdrop-blur-2xl border border-white/25 rounded-2xl px-6 py-3 shadow-2xl">
@@ -58,7 +39,7 @@ export default function App() {
               {Array.from({ length: 8 }).map((_, i) => (
                 <div
                   key={i}
-                  className="w-14 h-14 bg-white/20 rounded-xl border border-white/30 shadow-lg hover:scale-110 transition-transform duration-200"
+                  className="w-14 h-14 bg-white/20 rounded-xl border border-white/30 shadow-lg"
                 />
               ))}
             </div>
@@ -67,50 +48,12 @@ export default function App() {
       </div>
 
       {/* ░▒▓ NOTCH UI ▓▒░ */}
-      <NotchRen />
-
-      {/* ░▒▓ HANDOFF STATUS ▓▒░ */}
-      {isHandoffActive && (
-        <div className="absolute top-20 right-8 bg-green-500/20 backdrop-blur-xl border border-green-400/30 rounded-xl p-3 max-w-xs">
-          <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            <span className="text-green-200 text-xs">
-              Multi-device sync active
-            </span>
-          </div>
-          <div className="text-green-200/70 text-xs mt-1">
-            Conversations synced across all devices
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ToggleRow({
-  label,
-  value,
-  onToggle,
-  activeColor,
-}: {
-  label: string;
-  value: boolean;
-  onToggle: () => void;
-  activeColor: string;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-white/70 text-xs">{label}</span>
-      <button
-        onClick={onToggle}
-        className={`relative w-8 h-4 rounded-full transition-all duration-200
-          ${value ? activeColor : "bg-white/20"}`}
-      >
-        <div
-          className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all duration-200
-            ${value ? "left-4" : "left-0.5"}`}
-        />
-      </button>
+      <NotchRen
+        state={state}
+        onStateChange={setState}
+        isExpanded={isExpanded}
+        onToggleExpanded={() => setIsExpanded((prev) => !prev)}
+      />
     </div>
   );
 }

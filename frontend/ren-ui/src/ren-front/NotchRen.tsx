@@ -1,15 +1,25 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
 import { Mic, MicOff, Loader2, AlertTriangle, ChevronDown } from "lucide-react";
 
-type AssistantState = "idle" | "listening" | "responding" | "error";
+export type AssistantState = "idle" | "listening" | "responding" | "thinking" | "speaking" | "error";
 
-export function NotchRen() {
-  const [state, setState] = useState<AssistantState>("idle");
+export interface NotchRenProps {
+  state: AssistantState;
+  onStateChange: (s: AssistantState) => void;
+  isExpanded: boolean;
+  onToggleExpanded: () => void;
+}
+
+export function NotchRen({
+  state,
+  onStateChange,
+  isExpanded,
+  onToggleExpanded,
+}: NotchRenProps) {
   const [transcript, setTranscript] = useState("");
   const [response, setResponse] = useState("");
-  const [isExpanded, setIsExpanded] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
@@ -33,10 +43,10 @@ export function NotchRen() {
       };
 
       mediaRecorder.start();
-      setState("listening");
+      onStateChange("listening");
     } catch (err) {
       console.error("Mic access error:", err);
-      setState("error");
+      onStateChange("error");
     }
   };
 
@@ -45,39 +55,34 @@ export function NotchRen() {
   };
 
   /* ---------- Backend call ---------- */
-  /* --- NotchRen.tsx  --------------------------------------------- */
-const sendToBackend = async (blob: Blob) => {
-  /* 1️⃣  use the key Flask expects:  "file" */
-  const formData = new FormData();
-  formData.append("file", blob, "recording.wav");
+  const sendToBackend = async (blob: Blob) => {
+    const formData = new FormData();
+    formData.append("file", blob, "recording.wav"); // matches Flask key
 
-  try {
-    setState("responding");
+    try {
+      onStateChange("responding");
+      const res = await fetch("http://localhost:5001/transcribe", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-    /* 2️⃣  same /transcribe endpoint, now on port 5001 */
-    const res = await fetch("http://localhost:5001/transcribe", {
-      method: "POST",
-      body: formData,
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-    /* 3️⃣  Flask returns { "text": "<transcript>" } */
-    const { text } = await res.json();
-    setTranscript(text);      // show what you said
-    setResponse("");          // add LLM reply later if you wish
-    setState("idle");
-  } catch (err) {
-    console.error("Whisper backend error:", err);
-    setState("error");
-  }
-};
-  /* ---------- UI helpers ---------- */
-  const handleMicClick = () => {
-    if (state === "listening") stopRecording();
-    else startRecording();
+      const { text } = await res.json(); // { text: "..." }
+      setTranscript(text);
+      setResponse("");
+      onStateChange("idle");
+    } catch (err) {
+      console.error("Whisper backend error:", err);
+      onStateChange("error");
+    }
   };
 
-  const icon = () => {
+  /* ---------- UI helpers ---------- */
+  const handleMicClick = () => {
+    state === "listening" ? stopRecording() : startRecording();
+  };
+
+  const renderIcon = () => {
     switch (state) {
       case "listening":
       case "responding":
@@ -93,26 +98,25 @@ const sendToBackend = async (blob: Blob) => {
     }
   };
 
+  const statusText =
+    state === "listening"
+      ? "Listening..."
+      : state === "responding"
+      ? "Transcribing..."
+      : state === "error"
+      ? "Error - try again"
+      : "Ask Ren anything...";
+
   return (
     <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50">
       {/* ░▒▓ Notch Bar ▓▒░ */}
       <div className="notch-bar flex items-center gap-3">
         <button onClick={handleMicClick} className="p-1.5 rounded-lg">
-          {icon()}
+          {renderIcon()}
         </button>
-
-        <span className="text-sm opacity-70 select-none">
-          {state === "listening"
-            ? "Listening..."
-            : state === "responding"
-            ? "Transcribing..."
-            : state === "error"
-            ? "Error - try again"
-            : "Ask Ren anything..."}
-        </span>
-
+        <span className="text-sm opacity-70 select-none">{statusText}</span>
         <button
-          onClick={() => setIsExpanded(!isExpanded)}
+          onClick={onToggleExpanded}
           className="ml-auto p-1.5 rounded-lg hover:bg-white/10"
         >
           <ChevronDown
@@ -129,7 +133,6 @@ const sendToBackend = async (blob: Blob) => {
           <h4 className="mb-2 text-sm font-semibold text-white/90">
             Latest Conversation
           </h4>
-
           <div className="text-xs text-white/80 space-y-1">
             {transcript && (
               <p>
@@ -137,14 +140,12 @@ const sendToBackend = async (blob: Blob) => {
                 {transcript}
               </p>
             )}
-
             {response && (
               <p>
                 <span className="font-medium text-green-300">Ren:</span>{" "}
                 {response}
               </p>
             )}
-
             {!transcript && !response && (
               <p className="italic text-white/60">No messages yet.</p>
             )}
