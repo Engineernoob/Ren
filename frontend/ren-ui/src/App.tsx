@@ -1,18 +1,19 @@
-import { useState } from "react"
-import { NotchRen } from "./ren-front/NotchRen"
+import { useState } from "react";
+import { NotchRen } from "./ren-front/NotchRen";
 
 export default function App() {
-  const [state, setState] = useState<"idle" | "listening" | "responding" | "error">("idle")
-  const [isExpanded, setIsExpanded] = useState(false)
-  const [isHandoffActive, setIsHandoffActive] = useState(false)
+  const [state, setState] = useState<
+    "idle" | "listening" | "responding" | "error"
+  >("idle");
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isHandoffActive, setIsHandoffActive] = useState(false);
 
-  const toggleState = (newState: typeof state) => setState(newState)
-  const toggleExpanded = () => setIsExpanded((prev) => !prev)
-  const toggleHandoff = () => setIsHandoffActive((prev) => !prev)
+  const toggleState = (newState: typeof state) => setState(newState);
+  const toggleExpanded = () => setIsExpanded((prev) => !prev);
+  const toggleHandoff = () => setIsHandoffActive((prev) => !prev);
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-
       {/* ░▒▓ BACKGROUND & SYSTEM UI MOCK ▓▒░ */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800">
         <div className="absolute inset-0 opacity-30">
@@ -66,36 +67,33 @@ export default function App() {
       </div>
 
       {/* ░▒▓ NOTCH UI ▓▒░ */}
-      <NotchRen
-        state={state}
-        isDarkMode={true}
-        isHandoffActive={isHandoffActive}
-        onStateChange={setState}
-        onToggleExpanded={toggleExpanded}
-        isExpanded={isExpanded}
-      />
+      <NotchRen />
 
       {/* ░▒▓ DEV CONTROLS (debug only) ▓▒░ */}
       <div className="absolute bottom-8 left-8 bg-black/20 backdrop-blur-xl border border-white/20 rounded-2xl p-4 space-y-3 max-w-xs">
         <h4 className="text-white/90 text-sm">Dev Controls</h4>
 
         <div>
-          <label className="block text-white/70 text-xs mb-2">Assistant State</label>
+          <label className="block text-white/70 text-xs mb-2">
+            Assistant State
+          </label>
           <div className="grid grid-cols-2 gap-2">
-            {(["idle", "listening", "responding", "error"] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => toggleState(s)}
-                className={`px-3 py-2 rounded-lg text-xs border capitalize transition-all duration-200
+            {(["idle", "listening", "responding", "error"] as const).map(
+              (s) => (
+                <button
+                  key={s}
+                  onClick={() => toggleState(s)}
+                  className={`px-3 py-2 rounded-lg text-xs border capitalize transition-all duration-200
                   ${
                     state === s
                       ? "bg-blue-500/30 border-blue-400/50 text-white"
                       : "bg-white/5 border-white/20 text-white/70 hover:bg-white/10"
                   }`}
-              >
-                {s}
-              </button>
-            ))}
+                >
+                  {s}
+                </button>
+              )
+            )}
           </div>
         </div>
 
@@ -117,9 +115,19 @@ export default function App() {
 
         {/* Status */}
         <div className="pt-2 border-t border-white/20 text-xs text-white/50 space-y-1">
-          <div>State: <span className="text-white/70 capitalize">{state}</span></div>
-          <div>Expanded: <span className="text-white/70">{isExpanded ? "Yes" : "No"}</span></div>
-          <div>Handoff: <span className="text-white/70">{isHandoffActive ? "Active" : "Inactive"}</span></div>
+          <div>
+            State: <span className="text-white/70 capitalize">{state}</span>
+          </div>
+          <div>
+            Expanded:{" "}
+            <span className="text-white/70">{isExpanded ? "Yes" : "No"}</span>
+          </div>
+          <div>
+            Handoff:{" "}
+            <span className="text-white/70">
+              {isHandoffActive ? "Active" : "Inactive"}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -128,7 +136,9 @@ export default function App() {
         <div className="absolute top-20 right-8 bg-green-500/20 backdrop-blur-xl border border-green-400/30 rounded-xl p-3 max-w-xs">
           <div className="flex items-center space-x-2">
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            <span className="text-green-200 text-xs">Multi-device sync active</span>
+            <span className="text-green-200 text-xs">
+              Multi-device sync active
+            </span>
           </div>
           <div className="text-green-200/70 text-xs mt-1">
             Conversations synced across all devices
@@ -136,7 +146,7 @@ export default function App() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 function ToggleRow({
@@ -145,10 +155,10 @@ function ToggleRow({
   onToggle,
   activeColor,
 }: {
-  label: string
-  value: boolean
-  onToggle: () => void
-  activeColor: string
+  label: string;
+  value: boolean;
+  onToggle: () => void;
+  activeColor: string;
 }) {
   return (
     <div className="flex items-center justify-between">
@@ -164,5 +174,5 @@ function ToggleRow({
         />
       </button>
     </div>
-  )
+  );
 }

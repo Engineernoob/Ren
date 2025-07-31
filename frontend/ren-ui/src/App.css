@@ -150,3 +150,21 @@ body {
 .read-the-docs {
   color: #888;
 }
+
+/* ---- Notch Bar UI ---- */
+.notch-bar {
+  background-color: color-mix(in srgb, var(--popover), transparent 30%);
+  color: var(--popover-foreground);
+  padding: 0.5rem 1rem;
+  border-radius: 9999px; /* full pill shape */
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--border), transparent 70%);
+  transition: all 0.3s ease-in-out;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
