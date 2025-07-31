@@ -6,10 +6,10 @@ from typing import Optional
 
 from config import config
 from dialogue_manager import DialogueManager
-from sentiment_analyzer import SentimentAnalyzer
+from sentiment_analyzer import analyze_tone
 from persistent_memory import PersistentMemory
 from reminder_scheduler import ReminderScheduler
-from reminder_loop import ReminderLoop  # NEW
+from reminder_loop import ReminderLoop
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -21,7 +21,6 @@ class Agent:
         self.memory_store: PersistentMemory = PersistentMemory()
         self.scheduler = ReminderScheduler(memory=self.memory_store)
         self.dialogue_manager = DialogueManager(memory_store=self.memory_store, scheduler=self.scheduler)
-        self.sentiment_analyzer = SentimentAnalyzer()
         self.user_name: Optional[str] = self.memory_store.get("user_name")
         self.pending_name_change = None
         self.traits = {
@@ -30,7 +29,6 @@ class Agent:
             "memory_threshold": config.MEMORY_THRESHOLD,
         }
 
-        # Start background reminder loop
         self.reminder_loop = ReminderLoop(self.memory_store, self._handle_reminder_notification)
         self.reminder_loop.start()
 
@@ -43,14 +41,26 @@ class Agent:
         user_input = user_input.strip()
         logger.info(f"Processing user input: {user_input[:100]}...")
 
-        sentiment = self.sentiment_analyzer.analyze(user_input)
-        logger.info(f"Sentiment analysis result: {sentiment}")
+        tone_data = analyze_tone(user_input)
+        sentiment = tone_data["tone"]
+        confidence = tone_data["confidence", 0.0]
+        logger.info(f"Sentiment analysis result: {tone_data}")
 
         self.memory_store.set("last_sentiment", {
             "text": user_input,
             "sentiment": sentiment,
+            "raw_label": tone_data.get("raw_label"),
+            "confidence": confidence,
             "timestamp": time.time(),
         })
+        # 🔔 High-confidence emotional alert
+        if sentiment in ["serious", "tense", "low"] and confidence > 0.8:
+            return f"{self.user_name or ''}, you sound overwhelmed. Want me to pause distractions or give you a moment?"
+        
+        # 💡 Suggest an action based on tone
+        tone_suggestion = self._suggest_action_by_tone(sentiment)
+        if tone_suggestion:
+            return tone_suggestion
 
         if self.pending_name_change:
             normalized = user_input.lower()
@@ -83,7 +93,19 @@ class Agent:
         except Exception as e:
             logger.error(f"Error processing statement: {e}")
             return f"I'm sorry, but something went wrong on my end: {str(e)}"
-
+        
+    def _suggest_action_by_tone(self, tone: str) -> Optional[str]:
+        if tone == "tense":
+             return "You seem a bit tense. Want me to pause notifications or activate focus mode?"
+        elif tone == "low":
+             return "I’m sensing some heaviness. Would a breathing exercise or playlist help?"
+        elif tone == "serious":
+            return "Should I pull up your schedule or give you some quiet time?"
+        elif tone == "sharp":
+            return "That came through pretty strong. Want to talk through it or switch topics?"
+        else:
+            return None
+            
     def _generate_response(self, user_input: str, sentiment: Optional[str] = None) -> str:
         user_lower = user_input.lower()
         greetings = ["hi", "hello", "hey", "greetings", "good morning", "good evening", "good afternoon"]
@@ -174,9 +196,9 @@ class Agent:
         last = self.memory_store.get("last_sentiment")
         sentiment = last.get("sentiment") if last else None
 
-        if sentiment == "negative":
+        if sentiment == "serious":
             return "Still feeling off today? Want to talk more about it?"
-        if sentiment == "positive":
+        if sentiment == "warm":
             return "Still feeling okay? I'm glad. What else is on your mind?"
 
         return random.choice([

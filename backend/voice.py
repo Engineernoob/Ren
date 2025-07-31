@@ -4,6 +4,7 @@ import logging
 import os
 import tempfile
 
+from click import style
 import numpy as np
 from pydub import AudioSegment
 from pydub.playback import play
@@ -17,7 +18,15 @@ from speech_recognition import model as whisper_model
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Import speech recognition module
+TONE_TO_STYLE = {
+    "warm": "narration",
+    "calm": "conversational",
+    "serious": "serious",
+    "tense": "empathetic",
+    "low": "sad",
+    "light": "cheerful",
+    "sharp": "assertive"
+}
 
 
 # Global whisper model instance (lazy loading)
@@ -121,7 +130,7 @@ def transcribe_audio_file(file_stream: BytesIO) -> str:
         raise RuntimeError(f"Transcription failed: {e}")
 
 
-def speak(text) -> bytes:
+def speak(text: str, tone: str = "calm") -> bytes:
     """
     Convert text to speech using ElevenLabs API and return MP3 bytes.
 
@@ -151,9 +160,12 @@ def speak(text) -> bytes:
             "xi-api-key": config.ELEVENLABS_API_KEY,
             "Content-Type": "application/json",
         }
+        
+        style = TONE_TO_STYLE.get(tone, "conversational")
+        
         payload = {
             "text": text,
-            "voice_settings": {"stability": 0.4, "similarity_boost": 0.75}
+            "voice_settings": {"stability": 0.4, "similarity_boost": 0.75, "style": style}
         }
 
         logger.info("Calling ElevenLabs TTS API...")
