@@ -46,8 +46,12 @@ export function NotchRen({
   const chunksRef = useRef<Blob[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  /* Recording helpers */
-  const startRecording = async () => {
+  /* ────────── Voice Recording ────────── */
+  const toggleMic = async () => {
+    if (state === "listening") {
+      recorderRef.current?.stop();
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const rec = new MediaRecorder(stream);
@@ -58,63 +62,91 @@ export function NotchRen({
         e.data.size && chunksRef.current.push(e.data);
       rec.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: "audio/wav" });
-        await sendToBackend(blob);
+        await handleTranscribeAndChat(blob);
         stream.getTracks().forEach((t) => t.stop());
       };
 
       rec.start();
       onStateChange("listening");
-    } catch {
+    } catch (err) {
+      console.error(err);
       onStateChange("error");
     }
   };
-  const stopRecording = () => recorderRef.current?.stop();
-  const toggleMic = () =>
-    state === "listening" ? stopRecording() : startRecording();
 
-  /* Backend */
-  const sendToBackend = async (blob: Blob) => {
-    const form = new FormData();
-    form.append("file", blob, "recording.wav");
+  /* ────────── Transcribe + Chat ────────── */
+  const handleTranscribeAndChat = async (blob: Blob) => {
     try {
       onStateChange("responding");
-      const res = await fetch("http://localhost:5001/transcribe", {
+
+      // 1) Whisper transcription
+      const form = new FormData();
+      form.append("file", blob, "recording.wav");
+      const tRes = await fetch("http://localhost:5001/transcribe", {
         method: "POST",
         body: form,
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const { text } = await res.json();
+      if (!tRes.ok) throw new Error(`HTTP ${tRes.status}`);
+      const { text } = (await tRes.json()) as { text: string };
 
-      setMessages((m) => [...m, { role: "user", content: text }]);
-      setTimeout(() => {
-        setMessages((m) => [
-          ...m,
-          { role: "assistant", content: "Here’s your response from Ren." },
-        ]);
-        onStateChange("idle");
-      }, 1000);
-    } catch {
+      // 2) Add user message
+      setMessages((prev) => [...prev, { role: "user", content: text }]);
+
+      // 3) LLM chat via /ask
+      const cRes = await fetch("http://localhost:5001/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text }),
+      });
+      if (!cRes.ok) throw new Error(await cRes.text());
+      const { response } = (await cRes.json()) as { response: string };
+
+      // 4) Add assistant reply
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: response },
+      ]);
+      onStateChange("idle");
+    } catch (err) {
+      console.error(err);
       onStateChange("error");
     }
   };
 
-  /* Submit typed */
-  const handleSubmit = (e: FormEvent) => {
+  /* ────────── Typed Input ────────── */
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim()) return;
-    setMessages((m) => [...m, { role: "user", content: inputValue }]);
-    setInputValue("");
+
     onStateChange("responding");
-    setTimeout(() => {
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", content: "Sure – I’ve processed your query." },
+    setMessages((prev) => [...prev, { role: "user", content: inputValue }]);
+    const question = inputValue;
+    setInputValue("");
+
+    try {
+      const res = await fetch("http://localhost:5001/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: question }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { response } = (await res.json()) as { response: string };
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: response },
       ]);
+    } catch (err) {
+      console.error(err);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "Sorry, something went wrong." },
+      ]);
+    } finally {
       onStateChange("idle");
-    }, 1000);
+    }
   };
 
-  /* State indicator */
+  /* ────────── State Indicator ────────── */
   const indicator = (() => {
     switch (state) {
       case "listening":
@@ -147,6 +179,7 @@ export function NotchRen({
             <MicOff className="w-5 h-5 text-black/80" />
           )}
         </button>
+
         <form onSubmit={handleSubmit} className="flex-1">
           <input
             ref={inputRef}
@@ -160,14 +193,15 @@ export function NotchRen({
             className="w-full bg-transparent border-none outline-none placeholder-black/50 text-black/90 text-sm"
           />
         </form>
+
         <button
           onClick={onToggleExpanded}
           className="p-1.5 rounded-full bg-black/10 hover:bg-black/20"
         >
           <ChevronDown
-            className={`w-4 h-4 transition-transform ${
-              isExpanded ? "rotate-180" : ""
-            }`}
+            className={`w-4 h-4 transition-transform $
+                isExpanded ? "rotate-180" : ""
+              }`}
           />
         </button>
       </div>
@@ -181,7 +215,7 @@ export function NotchRen({
             </div>
           ))}
           <div className="controls">
-            <div className="buttons">
+            <div className="buttons flex space-x-2">
               <button
                 onClick={toggleMic}
                 className="p-2 rounded-lg bg-black/10 hover:bg-black/20"
