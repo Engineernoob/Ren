@@ -29,7 +29,7 @@ class Config:
         # Agent Configuration
         self.MEMORY_THRESHOLD = int(os.getenv('MEMORY_THRESHOLD', '20'))
         self.AGENT_NAME = os.getenv('AGENT_NAME', 'Ren')
-        self.AGENT_PERSONALITY = os.getenv('AGENT_PERSONALITY', 'calm, patient, articulate')
+        self.AGENT_PERSONALITY = os.getenv('AGENT_PERSONALITY', 'calm, introspective, articulate — poetic when needed, with quiet authority')
 
         # Background task manager toggle
         self.ENABLE_BACKGROUND_TASKS = os.getenv('ENABLE_BACKGROUND_TASKS', 'true').lower() == 'true'
