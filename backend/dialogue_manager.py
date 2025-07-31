@@ -1,9 +1,11 @@
 import re
-import uuid
 from typing import Optional
+import uuid
 
+from generate_reply import generate_reply
 from persistent_memory import PersistentMemory
 from reminder_scheduler import ReminderScheduler
+from sentiment_analyzer import analyze_tone
 
 
 class DialogueManager:
@@ -12,13 +14,16 @@ class DialogueManager:
         self.memory_store = memory_store
         self.scheduler = scheduler
 
+        # --- NEW: Rolling short-term memory for Ren's context ---
+        self.recent_memory = []
+
     def reset_state(self):
         self.dialogue_state.clear()
 
     def handle_input(self, user_input: str, user_name: Optional[str] = None):
         intent, slots = self._extract_intent_and_slots(user_input)
 
-        # --- NEW: Handle delete/cancel reminder intent ---
+        # --- Handle delete/cancel reminder intent ---
         if intent == "cancel_reminder":
             deleted = self._delete_matching_reminder(slots.get("task"), slots.get("time"))
             if deleted:
@@ -122,3 +127,35 @@ class DialogueManager:
                     self.scheduler.delete_reminder_by_id(reminder["id"])
                     return reminder
         return None
+
+    # --- NEW: Handle real-time input for Jarvis-style streaming ---
+    def handle_partial_transcription(self, partial_text: str, user_name: Optional[str] = None):
+        """
+        Jarvis-style real-time handler for partial speech input.
+        """
+        if len(partial_text.strip()) < 3:
+            return  # Skip empty/short inputs
+
+        tone = analyze_tone(partial_text)
+        memory_context = "\n".join(
+            [f"User: {m['user']}\nRen: {m['ren']}" for m in self.recent_memory[-5:]]
+        )
+
+        ren_reply = generate_reply(
+            user_input=partial_text,
+            memory=memory_context,
+            tone_data=tone,
+            user_name=user_name
+        )
+
+        self.recent_memory.append({
+            "user": partial_text,
+            "ren": ren_reply,
+            "tone": tone.get("tone", "neutral")
+        })
+
+        if len(self.recent_memory) > 10:
+            self.recent_memory.pop(0)
+
+        print(f"[Ren] {ren_reply}")
+        return ren_reply
