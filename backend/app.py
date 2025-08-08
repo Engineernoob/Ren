@@ -8,8 +8,11 @@ import sys
 from flask import Flask, jsonify, request
 from flask import Response
 from flask_cors import CORS
+from torch.utils import data
 
 from agent import Agent
+from backend.checkin_flow import CheckInState, handle_checkin_input
+from backend.intent_router import route_intent
 from config import config
 from voice import transcribe_audio_file
 from voice import listen_to_voice, speak
@@ -21,6 +24,8 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
+checkin_state: CheckInState = CheckInState()
+
 # Initialize agent
 try:
     ren_agent = Agent()
@@ -28,6 +33,7 @@ try:
 except Exception as e:
     logger.error(f"Failed to initialize agent: {e}")
     ren_agent = None
+   
 
 # Start the reminder scheduler
 if ren_agent and ren_agent.scheduler:
@@ -56,37 +62,71 @@ def teardown(exception):
 
 @app.route("/chat", methods=["POST"])
 def handle_text():
-    """Handle text-based chat requests."""
     try:
         if ren_agent is None:
             return jsonify({"error": "Agent not initialized"}), 503
-        
+
         if not request.is_json:
             return jsonify({"error": "Request must be JSON"}), 400
-        
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "Empty request body"}), 400
-        
-        if "message" not in data:
-            return jsonify({"error": "Missing 'message' in request body"}), 400
-        
-        user_input = data["message"]
-        
-        if not isinstance(user_input, str):
-            return jsonify({"error": "Message must be a string"}), 400
-        
-        if not user_input.strip():
-            return jsonify({"error": "Message cannot be empty"}), 400
-        
-        logger.info(f"Processing text request: {user_input[:50]}...")
+
+        data = request.get_json() or {}
+        user_input = data.get("message", "")
+        if not isinstance(user_input, str) or not user_input.strip():
+            return jsonify({"error": "Message must be a non-empty string"}), 400
+
+        # ── Intent routing ───────────────────────────────
+        intent = route_intent(user_input)
+        logger.info(f"Intent: {intent.name} (conf={intent.confidence:.2f}) slots={intent.slots}")
+
+        # graceful exit/farewell
+        if intent.name in ("exit", "farewell"):
+            return jsonify({"response": "👋 Understood. I’ll be here when you need me."}), 200
+
+        # structured check-in flow
+        if intent.name == "checkin":
+            global checkin_state
+            # If inactive, kick it off; else advance with input
+            if not checkin_state.active:
+                checkin_state = CheckInState(active=True, phase="intro")
+                reply = "Let’s do a quick check-in. How are you feeling right now?"
+                return jsonify({"response": reply, "phase": checkin_state.phase, "checkin": True}), 200
+            new_state, reply, done = handle_checkin_input(checkin_state, user_input)
+            checkin_state = new_state
+            if done:
+                # optional: persist summary in agent memory
+                try:
+                    ren_agent.memory_store.set("last_checkin_summary", checkin_state.summary or "")
+                except Exception:
+                    pass
+                checkin_state = CheckInState()  # reset
+            return jsonify({
+                "response": reply,
+                "phase": checkin_state.phase,
+                "done": done,
+                "checkin": True
+            }), 200
+
+        # simple reminder stub (hook to your scheduler)
+        if intent.name == "reminder":
+            task = intent.slots.get("task", "").strip() or "that thing you mentioned"
+            when = intent.slots.get("when", "").strip()
+            # TODO: integrate with ren_agent.scheduler if you have a method for this
+            # ren_agent.create_reminder(task, when)
+            text = f"Reminder noted: “{task}”{f' at {when}' if when else ''}. I’ll handle scheduling next."
+            return jsonify({"response": text, "intent": "reminder"}), 200
+
+        # weather/smalltalk/agent_action could be custom; for now, let LLM handle
+        # or branch here with your own handlers
+        # ────────────────────────────────────────────────
+
+        # default: send to your LLM agent
         response = ren_agent.process_statement(user_input)
-        
         return jsonify({
             "response": response,
-            "conversation_summary": ren_agent.get_conversation_summary()
-        })
-        
+            "conversation_summary": ren_agent.get_conversation_summary(),
+            "intent": intent.name
+        }), 200
+
     except ValueError as e:
         logger.warning(f"Validation error in text handler: {e}")
         return jsonify({"error": str(e)}), 400
@@ -210,6 +250,50 @@ def get_config():
             "duration": config.AUDIO_DURATION
         }
     })
+    
+@app.route("/checkin", methods=["GET", "POST", "DELETE"])
+def checkin():
+    global checkin_state
+
+    # GET => status
+    if request.method == "GET":
+        return jsonify({
+            "active": checkin_state.active,
+            "phase": checkin_state.phase,
+            "summary": checkin_state.summary
+        }), 200
+
+    # DELETE => cancel
+    if request.method == "DELETE":
+        checkin_state = CheckInState()  # reset
+        return jsonify({"ok": True, "active": False}), 200
+
+    # POST => start or progress the flow
+    data = request.get_json(silent=True) or {}
+    user_input = (data.get("message") or "").strip()
+
+    # start if inactive or no user input provided
+    if not checkin_state.active and not user_input:
+        checkin_state = CheckInState(active=True, phase="intro")
+        return jsonify({
+            "active": True,
+            "phase": checkin_state.phase,
+            "reply": "Let’s do a quick check-in. How are you feeling right now?"
+        }), 200
+
+    # progress the flow
+    new_state, reply, done = handle_checkin_input(checkin_state, user_input)
+    checkin_state = new_state
+    if done:
+        # optional: persist summary via ren_agent.memory_store if you want
+        checkin_state = CheckInState()  # reset after wrap
+
+    return jsonify({
+        "active": checkin_state.active,
+        "phase": checkin_state.phase,
+        "reply": reply,
+        "done": done
+    }), 200
 
 @app.errorhandler(404)
 def not_found(error):
