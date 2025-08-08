@@ -11,9 +11,9 @@ from flask_cors import CORS
 from torch.utils import data
 
 from agent import Agent
-from backend.checkin_flow import CheckInState, handle_checkin_input
-from backend.intent_router import route_intent
+from checkin_flow import CheckInState, handle_checkin_input
 from config import config
+from intent_router import route_intent
 from voice import transcribe_audio_file
 from voice import listen_to_voice, speak
 
